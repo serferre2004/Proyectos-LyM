@@ -116,6 +116,21 @@ def parse(tokens):
                 else:
                     raise SyntaxError("Expected closing parenthesis after variable declaration")
 
+            elif token[0] == 'KEYWORD' and token[1] == 'turn':
+                # Se espera que el token siguiente sea una de las direcciones válidas
+                direction_token = next(token_iter)
+                if direction_token[1] not in [':left', ':right', ':around']:
+                    raise SyntaxError(f"Expected :left, :right, or :around after 'turn', got {direction_token[1]}")
+
+                # Verificamos que haya un paréntesis de cierre después del comando 'move'
+                close_paren_token = next(token_iter)
+                if close_paren_token[0] == 'OPERATOR' and close_paren_token[1] == ')':
+                    if not stack or stack[-1][1] != '(':
+                        raise SyntaxError("Unmatched closing parenthesis")
+                    stack.pop()
+                else:
+                    raise SyntaxError("Expected closing parenthesis after variable declaration")
+
 
             # Aquí se agregarían más condiciones para manejar otros tipos de tokens y estructuras
             
