@@ -305,6 +305,12 @@ def parse(tokens):
                     condition_token = next(token_iter)
                     token_siguiente = next(token_iter)[1] # token siguiente a condition_token
                     token_siguiente_al_siguiente = next(token_iter)[1]
+                    if token_siguiente_al_siguiente[0] == 'OPERATOR' and token_siguiente_al_siguiente[1] == ')':
+                        if not stack or stack[-1][1] != '(':
+                            raise SyntaxError("Unmatched closing parenthesis")
+                        stack.pop()
+                    else:
+                        raise SyntaxError("Expected closing parenthesis after variable declaration")
                     if condition_token[0] == 'OPERATOR' and condition_token[1] == ')':
                         break
                     elif condition_token[0] == 'CONDITIONS' and condition_token[1] in ["can-move?", "can-pick?", "isZero?", "not", "facing?", "blocked?", "can-put?"]:
@@ -322,11 +328,10 @@ def parse(tokens):
                                 raise SyntaxError("Expected closing parenthesis after variable declaration")     
                     else:
                         # Si el token no es una dirección válida, lanzar un error
-                        raise SyntaxError(f"Expected a condition, got {condition_token[1]}")
-                    
+                        raise SyntaxError(f"Expected a condition, got {condition_token[1]}") 
                 if not conditions:
                     raise SyntaxError("No conditions provided for 'if' command")
-                
+                instruction_token = next(token)
             # Aquí se agregarían más condiciones para manejar otros tipos de tokens y estructuras
             
             else:
@@ -344,7 +349,7 @@ def parse(tokens):
         print(f"Syntax error: {e}")
         return False
 
-# Estructura de Token para el ejemplo
+# Estructura de Token
 class Token:
     def __init__(self, type, value):
         self.type = type
