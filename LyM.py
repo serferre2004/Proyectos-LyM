@@ -1,13 +1,22 @@
 import re
+#Bugs actuales:
+"""
+No se están identificando los tokens dentro de la categoria CONSTANT y en su lugar se asignan como VARIABLE, aunque esta asignacion para estos tokens sea incorrecta
+en la gran mayoria de los casos es irrelevante para decidir si el codigo esta bien o mal pues una variable puede ser una constante y el bug se arregla al pedirle que busque dentro de VARIABLES
+sin embargo en = name n esto no funciona al usar una de las constantes pues esta esperando un numero o especificamente una de dichas constantes, por lo que no es posible emplear la categoria VARIABLE.-ARREGLADO
 
+
+"""
 def tokenize(code):
     # Expresiones regulares para diferentes tipos de tokens
     token_specification = [
-        ("KEYWORD", r"\b(?:move-face|run-dirs|move-dir|defvar|move|skip|turn|face|put|pick|if|loop|repeat|defun)\b"),
+        ("KEYWORD", r"\b(?:move-face|run-dirs|move-dir|defvar|move|skip|turn|face|put|pick|if|loop|repeat|defun|null)\b"),
+        ("CONSTANT", r"\b(?:Dim|myXpos|myYpos|myChips|myBalloons|balloonsHere|ChipsHere|Spaces)\b"),
+        ("CONDITIONS", r"(?:can-move\?|can-pick\?|isZero\?|not|facing\?|blocked\?|can-put\?)"),
         ("DIRECTION", r":(?:north|south|east|west|left|right|around|front|back|up|down)"),
         ("ACTION", r":(?:balloons|chips)"),
         ("NUMBER", r"\b\d+\b"),
-        ("VARIABLE", r"\b[a-zA-Z_][a-zA-Z0-9_]*\b"),
+        ("VARIABLE", r"\b[a-zA-Z_](?<!:)[a-zA-Z0-9_]*\b"),
         ("OPERATOR", r"[=()]"),
         ("SKIP", r"[ \t\n]"),  # Espacios, tabuladores y saltos de línea
     ]
@@ -32,8 +41,8 @@ def tokenize(code):
 
     return tokens
 
-# Pruebas
-code = "(defvar name 10) (= name 2) (move 10) (skip 2) (move 10)(turn :right) (face :east) (put :chips n) (pick :balloons n)  (move-dir n :front) (run-dirs (:left :left :right)) (move-face n :north)"
+# Pruebas, se inserta la linea de codigo a probar, se sugiere ir agregando en cascada el nuevo comando a implementar
+code = "(defvar name 10) (= name Dim) (move Dim) (skip 2) (move 10) (turn :right) (face :east) (put :chips n) (pick :balloons n) (move-dir n :front) (run-dirs (:left :left :right)) (move-face n :north) (null) (if (facing? :east))"
 print(tokenize(code))
 
 class SyntaxError(Exception):
@@ -49,6 +58,7 @@ def parse(tokens):
     Returns:
         bool: True si la sintaxis es correcta, False si hay un error.
     """
+    constants = ["Dim", "myXpos", "myYpos", "myChips", "myBalloons", "balloonsHere", "ChipsHere", "Spaces"]
     token_iter = iter(tokens)
     stack = []  # Pila para manejar los paréntesis
 
@@ -73,7 +83,7 @@ def parse(tokens):
 
                     # Se espera que el siguiente token sea un número o una constante
                     value_token = next(token_iter)
-                    if value_token[0] not in ['NUMBER', 'CONSTANT']:
+                    if value_token[0] not in ['NUMBER'] and value_token[0] not in ['CONSTANT']:
                         raise SyntaxError(f"Expected a number or a constant after variable name, got {value_token[1]}")
 
                     # Se espera un paréntesis de cierre después de la asignación
@@ -271,7 +281,50 @@ def parse(tokens):
                     stack.pop()
                 else:
                     raise SyntaxError("Expected closing parenthesis after variable declaration")
-    
+                
+#Null
+            elif token[0] == 'KEYWORD' and token[1] == 'null':
+                # Se espera un paréntesis de cierre después del token null
+                close_paren_token = next(token_iter)
+                if close_paren_token[0] == 'OPERATOR' and close_paren_token[1] == ')':
+                    if not stack or stack[-1][1] != '(':
+                        raise SyntaxError("Unmatched closing parenthesis")
+                    stack.pop()
+                else:
+                    raise SyntaxError("Expected closing parenthesis after variable declaration")
+
+#If
+            elif token[0] == 'KEYWORD' and token[1] == 'if':
+                # Se espera que el siguiente token sea una condición válida
+                open_paren_token = next(token_iter)
+                if open_paren_token[0] != 'OPERATOR' or open_paren_token[1] != '(':
+                    raise SyntaxError("Expected '(' after 'if' keyword")
+                #Se Recorre el parentesis hasta que encontremos el paréntesis de cierre ')'
+                conditions = []
+                while True:
+                    condition_token = next(token_iter)
+                    token_siguiente = next(token_iter)[1] # token siguiente a condition_token
+                    token_siguiente_al_siguiente = next(token_iter)[1]
+                    if condition_token[0] == 'OPERATOR' and condition_token[1] == ')':
+                        break
+                    elif condition_token[0] == 'CONDITIONS' and condition_token[1] in ["can-move?", "can-pick?", "isZero?", "not", "facing?", "blocked?", "can-put?"]:
+                        if condition_token[1] == 'facing?' and token_siguiente not in [':north', ':south', ':west', ':east']:
+                            raise SyntaxError(f"Expected :north, :south, :west, :east, got {token_siguiente}")
+                        else:
+                            close_paren_token = next(token_iter)
+                            if close_paren_token[0] == 'OPERATOR' and close_paren_token[1] == ')':
+                                if not stack or stack[-1][1] != '(':
+                                    raise SyntaxError("Unmatched closing parenthesis")
+                                stack.pop()
+                            else:
+                                raise SyntaxError("Expected closing parenthesis after variable declaration")     
+                    else:
+                        # Si el token no es una dirección válida, lanzar un error
+                        raise SyntaxError(f"Expected a condition, got {condition_token[1]}")
+                    
+                if not conditions:
+                    raise SyntaxError("No conditions provided for 'if' command")
+                
             # Aquí se agregarían más condiciones para manejar otros tipos de tokens y estructuras
             
             else:
