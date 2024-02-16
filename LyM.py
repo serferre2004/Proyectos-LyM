@@ -48,7 +48,7 @@ print(tokenize(code))
 class SyntaxError(Exception):
     pass
 
-def parse(tokens):
+def parse_comands(tokens):
     """
     Analiza una lista de tokens basada en la gramática del lenguaje.
     
@@ -292,46 +292,6 @@ def parse(tokens):
                     stack.pop()
                 else:
                     raise SyntaxError("Expected closing parenthesis after variable declaration")
-
-#If
-            elif token[0] == 'KEYWORD' and token[1] == 'if':
-                # Se espera que el siguiente token sea una condición válida
-                open_paren_token = next(token_iter)
-                if open_paren_token[0] != 'OPERATOR' or open_paren_token[1] != '(':
-                    raise SyntaxError("Expected '(' after 'if' keyword")
-                #Se Recorre el parentesis hasta que encontremos el paréntesis de cierre ')'
-                conditions = []
-                while True:
-                    condition_token = next(token_iter)
-                    token_siguiente = next(token_iter)[1] # token siguiente a condition_token
-                    token_siguiente_al_siguiente = next(token_iter)[1]
-                    if token_siguiente_al_siguiente[0] == 'OPERATOR' and token_siguiente_al_siguiente[1] == ')':
-                        if not stack or stack[-1][1] != '(':
-                            raise SyntaxError("Unmatched closing parenthesis")
-                        stack.pop()
-                    else:
-                        raise SyntaxError("Expected closing parenthesis after variable declaration")
-                    if condition_token[0] == 'OPERATOR' and condition_token[1] == ')':
-                        break
-                    elif condition_token[0] == 'CONDITIONS' and condition_token[1] in ["can-move?", "can-pick?", "isZero?", "not", "facing?", "blocked?", "can-put?"]:
-                        if condition_token[1] == 'facing?' and token_siguiente not in [':north', ':south', ':west', ':east']:
-                            raise SyntaxError(f"Expected :north, :south, :west, :east, got {token_siguiente}")
-                        if condition_token[1] == 'can-move?' and token_siguiente not in [':north', ':south', ':west', ':east']:
-                            raise SyntaxError(f"Expected :north, :south, :west, :east, got {token_siguiente}")
-                        else:
-                            close_paren_token = next(token_iter)
-                            if close_paren_token[0] == 'OPERATOR' and close_paren_token[1] == ')':
-                                if not stack or stack[-1][1] != '(':
-                                    raise SyntaxError("Unmatched closing parenthesis")
-                                stack.pop()
-                            else:
-                                raise SyntaxError("Expected closing parenthesis after variable declaration")     
-                    else:
-                        # Si el token no es una dirección válida, lanzar un error
-                        raise SyntaxError(f"Expected a condition, got {condition_token[1]}") 
-                if not conditions:
-                    raise SyntaxError("No conditions provided for 'if' command")
-                instruction_token = next(token)
             # Aquí se agregarían más condiciones para manejar otros tipos de tokens y estructuras
             
             else:
@@ -357,5 +317,5 @@ class Token:
 
 
 # Llamada a la función de análisis
-is_syntax_correct = parse(tokenize(code))
+is_syntax_correct = parse_comands(tokenize(code))
 print("Syntax is correct:", is_syntax_correct)
