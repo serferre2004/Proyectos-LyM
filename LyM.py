@@ -42,7 +42,7 @@ def tokenize(code):
     return tokens
 
 # Pruebas, se inserta la linea de codigo a probar, se sugiere ir agregando en cascada el nuevo comando a implementar
-code = "(defvar name 10) (= name Dim) (move Dim) (skip 2) (move 10) (turn :right) (face :east) (put :chips n) (pick :balloons n) (move-dir n :front) (run-dirs (:left :left :right)) (move-face n :north) (null) (if (facing? :east))"
+code = "(defvar name 10) (= name Dim) (move Dim) (skip 2) (move 10) (turn :right) (face :east) (put :chips n) (pick :balloons n) (move-dir n :front) (run-dirs (:left :left :right)) (move-face n :north) (null) (if (isZero? 10))"
 print(tokenize(code))
 
 class SyntaxError(Exception):
@@ -309,6 +309,8 @@ def parse(tokens):
                         break
                     elif condition_token[0] == 'CONDITIONS' and condition_token[1] in ["can-move?", "can-pick?", "isZero?", "not", "facing?", "blocked?", "can-put?"]:
                         if condition_token[1] == 'facing?' and token_siguiente not in [':north', ':south', ':west', ':east']:
+                            raise SyntaxError(f"Expected :north, :south, :west, :east, got {token_siguiente}")
+                        if condition_token[1] == 'can-move?' and token_siguiente not in [':north', ':south', ':west', ':east']:
                             raise SyntaxError(f"Expected :north, :south, :west, :east, got {token_siguiente}")
                         else:
                             close_paren_token = next(token_iter)
