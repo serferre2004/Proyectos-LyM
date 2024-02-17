@@ -41,30 +41,24 @@ def tokenize(code):
 
     return tokens
 
-# Pruebas, se inserta la linea de codigo a probar, se sugiere ir agregando en cascada el nuevo comando a implementar
-code = "(defvar name 10) (= name Dim) (move Dim) (skip 2) (move 10) (turn :right) (face :east) (put :chips n) (pick :balloons n) (move-dir n :front) (run-dirs (:left :left :right)) (move-face n :north) (null) (if (isZero? 10))"
-print(tokenize(code))
 
 class SyntaxError(Exception):
     pass
 
-def parse_comands(tokens):
+constants = ["Dim", "myXpos", "myYpos", "myChips", "myBalloons", "balloonsHere", "ChipsHere", "Spaces"]
+stack = []  # Pila para manejar los paréntesis
+def parse_commands(token_iter, token):
     """
     Analiza una lista de tokens basada en la gramática del lenguaje.
     
     Args:
-        tokens (list): Lista de tokens para analizar.
+        token_iter : Iterador de tokens a parsear.
     
     Returns:
         bool: True si la sintaxis es correcta, False si hay un error.
     """
-    constants = ["Dim", "myXpos", "myYpos", "myChips", "myBalloons", "balloonsHere", "ChipsHere", "Spaces"]
-    token_iter = iter(tokens)
-    stack = []  # Pila para manejar los paréntesis
-
     try:
-        while True:  # Continuar hasta que no haya más tokens
-            token = next(token_iter)
+        while True:
 
             if token[0] == 'OPERATOR' :
                 if token[1] == '(':
@@ -96,7 +90,7 @@ def parse_comands(tokens):
                         raise SyntaxError("Expected closing parenthesis after variable declaration")
                 else:
                     raise SyntaxError(f"Unexpected operator: {token[1]}")
-#Defvar
+        #Defvar
             elif token[0] == 'KEYWORD' and token[1] == 'defvar':
                 # Esperamos que el siguiente token sea el nombre de la variable
                 name_token = next(token_iter)
@@ -117,7 +111,7 @@ def parse_comands(tokens):
                 else:
                     raise SyntaxError("Expected closing parenthesis after variable declaration")
                 
-#Move      
+        #Move      
             elif token[0] == 'KEYWORD' and token[1] == 'move':
                 # Se espera que el token siguiente sea un número, una variable o una constante
                 n_token = next(token_iter)
@@ -133,7 +127,7 @@ def parse_comands(tokens):
                 else:
                     raise SyntaxError("Expected closing parenthesis after variable declaration")
 
-#Skip
+        #Skip
             elif token[0] == 'KEYWORD' and token[1] == 'skip':
                 # Se espera que el token siguiente sea un número, una variable o una constante
                 n_token = next(token_iter)
@@ -148,7 +142,7 @@ def parse_comands(tokens):
                     stack.pop()
                 else:
                     raise SyntaxError("Expected closing parenthesis after variable declaration")
-#Turn
+        #Turn
             elif token[0] == 'KEYWORD' and token[1] == 'turn':
                 # Se espera que el token siguiente sea una de las direcciones válidas
                 direction_token = next(token_iter)
@@ -163,7 +157,7 @@ def parse_comands(tokens):
                     stack.pop()
                 else:
                     raise SyntaxError("Expected closing parenthesis after variable declaration")
-#Face 
+        #Face 
             elif token[0] == 'KEYWORD' and token[1] == 'face':
                 # Se espera que el token siguiente sea una de las direcciones válidas
                 direction_token = next(token_iter)
@@ -178,7 +172,7 @@ def parse_comands(tokens):
                     stack.pop()
                 else:
                     raise SyntaxError("Expected closing parenthesis after variable declaration")
-#Put
+        #Put
             elif token[0] == 'KEYWORD' and token[1] == 'put':
                 # Se espera que el token siguiente sea :balloons o :chips
                 item_token = next(token_iter)
@@ -198,7 +192,7 @@ def parse_comands(tokens):
                     stack.pop()
                 else:
                     raise SyntaxError("Expected closing parenthesis after variable declaration")
-#Pick
+        #Pick
             elif token[0] == 'KEYWORD' and token[1] == 'pick':
                 # Se espera que el token siguiente sea :balloons o :chips
                 item_token = next(token_iter)
@@ -218,7 +212,7 @@ def parse_comands(tokens):
                     stack.pop()
                 else:
                     raise SyntaxError("Expected closing parenthesis after variable declaration")
-#move-dir
+        #move-dir
             elif token[0] == 'KEYWORD' and token[1] == 'move-dir':
                 # Se espera que el siguiente token sea un número o una variable que represente la cantidad de pasos
                 steps_token = next(token_iter)
@@ -239,7 +233,7 @@ def parse_comands(tokens):
                 else:
                     raise SyntaxError("Expected closing parenthesis after variable declaration")
 
-#Run-dirs
+        #Run-dirs
             elif token[0] == 'KEYWORD' and token[1] == 'run-dirs':
                 # Se espera que el token siguiente sea un paréntesis abierto '('
                 open_paren_token = next(token_iter)
@@ -261,7 +255,7 @@ def parse_comands(tokens):
                 # Verificar que se haya recogido al menos una dirección
                 if not directions:
                     raise SyntaxError("No directions provided for 'run-dirs' command")
-#Move-face
+        #Move-face
             elif token[0] == 'KEYWORD' and token[1] == 'move-face':
                 # Se espera que el siguiente token sea un número o una variable que represente la cantidad de pasos
                 steps_token = next(token_iter)
@@ -282,7 +276,7 @@ def parse_comands(tokens):
                 else:
                     raise SyntaxError("Expected closing parenthesis after variable declaration")
                 
-#Null
+        #Null
             elif token[0] == 'KEYWORD' and token[1] == 'null':
                 # Se espera un paréntesis de cierre después del token null
                 close_paren_token = next(token_iter)
@@ -296,18 +290,89 @@ def parse_comands(tokens):
             
             else:
                 raise SyntaxError(f"Unexpected token: {token[1]}")
+            token = next(token_iter)
+    except:
+        return token
 
-        # Verificamos si hay paréntesis sin cerrar
-        if stack:
-            raise SyntaxError("Unmatched opening parenthesis")
+    # Verificamos si hay paréntesis sin cerrar
     
-    except StopIteration:
-        # Hemos llegado al final de los tokens sin errores
-        return not stack  # La sintaxis es correcta si no hay paréntesis sin cerrar
-    
-    except SyntaxError as e:
-        print(f"Syntax error: {e}")
-        return False
+def parse_controlstructs(token_iter, token):
+    try:
+        while True:
+            if token[0] == 'OPERATOR' :
+                if token[1] == '(':
+                    stack.append(token)
+                
+                elif token[1] == ')':
+                    if not stack or stack[-1][1] != '(':
+                        raise SyntaxError("Unmatched closing parenthesis")
+                    stack.pop()
+                    
+                elif token[1] == '=':
+                    # Se espera que el siguiente token sea el nombre de la variable
+                    name_token = next(token_iter)
+                    if name_token[0] != 'VARIABLE':
+                        raise SyntaxError(f"Expected a variable name after '=', got {name_token[1]}")
+
+                    # Se espera que el siguiente token sea un número o una constante
+                    value_token = next(token_iter)
+                    if value_token[0] not in ['NUMBER'] and value_token[0] not in ['CONSTANT']:
+                        raise SyntaxError(f"Expected a number or a constant after variable name, got {value_token[1]}")
+
+                    # Se espera un paréntesis de cierre después de la asignación
+                    close_paren_token = next(token_iter)
+                    if close_paren_token[0] == 'OPERATOR' and close_paren_token[1] == ')':
+                        if not stack or stack[-1][1] != '(':
+                            raise SyntaxError("Unmatched closing parenthesis")
+                        stack.pop()
+                    else:
+                        raise SyntaxError("Expected closing parenthesis after variable declaration")
+                else:
+                    raise SyntaxError(f"Unexpected operator: {token[1]}")
+            elif token[0] == 'KEYWORD' and token[1] == 'if':
+                # Se espera que el siguiente token sea una condición válida
+                open_paren_token = next(token_iter)
+                if open_paren_token[0] != 'OPERATOR' or open_paren_token[1] != '(':
+                    raise SyntaxError("Expected '(' after 'if' keyword")
+                #Se Recorre el parentesis hasta que encontremos el paréntesis de cierre ')'
+                conditions = []
+                while True:
+                    condition_token = next(token_iter)
+                    token_siguiente = next(token_iter)[1] # token siguiente a condition_token
+                    if condition_token[0] == 'OPERATOR' and condition_token[1] == ')':
+                        break
+                    elif condition_token[0] == 'CONDITIONS' and condition_token[1] in ["can-move?", "can-pick?", "isZero?", "not", "facing?", "blocked?", "can-put?"]:
+                        if condition_token[1] == 'facing?' and token_siguiente not in [':north', ':south', ':west', ':east']:
+                            raise SyntaxError(f"Expected :north, :south, :west, :east, got {token_siguiente}")
+                        if condition_token[1] == 'can-move?' and token_siguiente not in [':north', ':south', ':west', ':east']:
+                            raise SyntaxError(f"Expected :north, :south, :west, :east, got {token_siguiente}")
+                        else:
+                            close_paren_token = next(token_iter)
+                            if close_paren_token[0] == 'OPERATOR' and close_paren_token[1] == ')':
+                                if not stack or stack[-1][1] != '(':
+                                    raise SyntaxError("Unmatched closing parenthesis")
+                                stack.pop()
+                            else:
+                                raise SyntaxError("Expected closing parenthesis after variable declaration")     
+                    else:
+                        # Si el token no es una dirección válida, lanzar un error
+                        raise SyntaxError(f"Expected a condition, got {condition_token[1]}") 
+                if not conditions:
+                    raise SyntaxError("No conditions provided for 'if' command")
+                instruction_token = next(token)
+            # Aquí se agregarían más condiciones para manejar otros tipos de tokens y estructuras
+            
+            else:
+                raise SyntaxError(f"Unexpected token: {token[1]}")
+            token = next(token_iter)
+            
+    except:
+        pass
+
+# Verificamos si hay paréntesis sin cerrar
+    if stack:
+        raise SyntaxError("Unmatched opening parenthesis")
+
 
 # Estructura de Token
 class Token:
@@ -317,5 +382,4 @@ class Token:
 
 
 # Llamada a la función de análisis
-is_syntax_correct = parse_comands(tokenize(code))
-print("Syntax is correct:", is_syntax_correct)
+
