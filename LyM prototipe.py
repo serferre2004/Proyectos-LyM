@@ -380,31 +380,12 @@ def parse_comands(tokens):
                 token_siguiente = next(token_iter)[1] # token siguiente a condition_token
                 if token_siguiente != '(':
                     raise SyntaxError("Expected '(' after variable")
-
-                # Recopilar las direcciones hasta que encontremos el paréntesis de cierre ')'
-                conditions = []
                 while True:
                     conditions_tokens = next(token_iter)
-                    token_siguiente = next(token_iter)[1] # token siguiente a condition_token
-                    if conditions_tokens[0] == 'OPERATOR' and conditions_tokens[1] == ')':
+                    token_siguiente = next(token_iter)[1]
+                    toke_siguiente_siguiente = next(token_iter)[1]# token siguiente a condition_token
+                    if token_siguiente == ')' or toke_siguiente_siguiente == ')':
                         break
-                    elif conditions_tokens[1] == 'not' and token_siguiente == '(':
-                        conditions.append(conditions_tokens[1])
-                    elif conditions_tokens[0] == 'CONDITIONS' and conditions_tokens[1] in  ["can-move?", "can-pick?", "isZero?", "not", "facing?", "blocked?", "can-put?"]:
-                        conditions.append(conditions_tokens[1])
-                    elif conditions_tokens[0] == 'DIRECTION' and conditions_tokens[1] in  [':north', ':south', ':west', ':east']:
-                        conditions.append(conditions_tokens[1])
-                    elif conditions_tokens[0] == 'NUMBER':
-                        conditions.append(conditions_tokens[1])
-                    elif conditions_tokens[0] == 'VARIABLE' and conditions_tokens[1] in  ['chips', 'balloons']:
-                        conditions.append(conditions_tokens[1])
-                    else:
-                        # Si el token no es una dirección válida, lanzar un error
-                        raise SyntaxError(f"Expected a condition, got {conditions_tokens[1]}")
-                
-                # Verificar que se haya recogido al menos una dirección
-                if not conditions:
-                    raise SyntaxError("No conditions provided for 'run-dirs' command")
 #Defun
             elif token[0] == 'KEYWORD' and token[1] == 'defun':
                 name_token = next(token_iter)
