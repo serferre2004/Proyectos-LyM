@@ -7,6 +7,16 @@ sin embargo en = name n esto no funciona al usar una de las constantes pues esta
 
 
 """
+class function :
+    def __init__(self, name, parameters):
+        self.name = name
+        self.parameters = parameters  #List of tuples (parameter name, parameter type)
+        
+class variable :
+    def __init__(self, name, value):
+        self.name = name
+        self.value = value
+        
 def tokenize(code):
     # Expresiones regulares para diferentes tipos de tokens
     token_specification = [
@@ -42,7 +52,8 @@ def tokenize(code):
     return tokens
 
 # Pruebas, se inserta la linea de codigo a probar, se sugiere ir agregando en cascada el nuevo comando a implementar
-code =  "(defvar name 10) (= name Dim) (move Dim) (skip 2) (move 10) (turn :right) (face :east) (put :chips n) (pick :balloons n) (move-dir n :front) (run-dirs (:left :left :right)) (move-face n :north) (null) (if (not(can-put? chips)) (move 5) (null)) (loop (not(can-put? chips)) (move 5)) (repeat n (null))"
+code =  "(defvar name 10) (= name Dim) (move Dim) (skip 2) (move 10) (turn :right) (face :east) (put :chips n) (pick :balloons n) (move-dir n :front) (run-dirs (:left :left :right)) (move-face n :north) (null) (if (not(can-put? chips)) (move 5) (null)) (loop (not(can-put? chips)) (move 5)) (repeat n (null) (defun foo (a b) (move name) (skip 4)))"
+code = "(defvar bar 5) (= bar 10) (defun foo (a b) (move bar) (null)) (foo 5 10)"
 print(tokenize(code))
 
 class SyntaxError(Exception):
@@ -59,6 +70,8 @@ def parse_comands(tokens):
         bool: True si la sintaxis es correcta, False si hay un error.
     """
     constants = ["Dim", "myXpos", "myYpos", "myChips", "myBalloons", "balloonsHere", "ChipsHere", "Spaces"]
+    functions = {}
+    variables = {}
     token_iter = iter(tokens)
     stack = []  # Pila para manejar los paréntesis
 
@@ -80,7 +93,8 @@ def parse_comands(tokens):
                     name_token = next(token_iter)
                     if name_token[0] != 'VARIABLE':
                         raise SyntaxError(f"Expected a variable name after '=', got {name_token[1]}")
-
+                    if name_token[1] not in variables:
+                        raise SyntaxError(f"Variable {name_token[1]} not exist")
                     # Se espera que el siguiente token sea un número o una constante
                     value_token = next(token_iter)
                     if value_token[0] not in ['NUMBER'] and value_token[0] not in ['CONSTANT']:
@@ -94,6 +108,7 @@ def parse_comands(tokens):
                         stack.pop()
                     else:
                         raise SyntaxError("Expected closing parenthesis after variable declaration")
+                    variables[name_token[1]].value = value_token[1]
                 else:
                     raise SyntaxError(f"Unexpected operator: {token[1]}")
 #Defvar
@@ -117,11 +132,13 @@ def parse_comands(tokens):
                 else:
                     raise SyntaxError("Expected closing parenthesis after variable declaration")
                 
+                exec(f"var_{name_token[1]} = variable(name_token[1], value_token[1])") 
+                exec(f"variables[name_token[1]] = var_{name_token[1]}")
 #Move      
             elif token[0] == 'KEYWORD' and token[1] == 'move':
                 # Se espera que el token siguiente sea un número, una variable o una constante
                 n_token = next(token_iter)
-                if n_token[0] not in ['NUMBER', 'VARIABLE', 'CONSTANT']:
+                if n_token[0] not in ['NUMBER', 'CONSTANT'] and n_token[1] not in variables:
                     raise SyntaxError(f"Expected a number, variable, or constant after 'move', got {n_token[1]}")
 
                 # Se espera un paréntesis de cierre después de la asignación
@@ -137,7 +154,7 @@ def parse_comands(tokens):
             elif token[0] == 'KEYWORD' and token[1] == 'skip':
                 # Se espera que el token siguiente sea un número, una variable o una constante
                 n_token = next(token_iter)
-                if n_token[0] not in ['NUMBER', 'VARIABLE', 'CONSTANT']:
+                if n_token[0] not in ['NUMBER', 'CONSTANT'] and n_token[1] not in variables:
                     raise SyntaxError(f"Expected a number, variable, or constant after 'skip', got {n_token[1]}")
                 
                 # Se espera un paréntesis de cierre después de la asignación
@@ -187,7 +204,7 @@ def parse_comands(tokens):
 
                 # Se espera que el siguiente token sea un número o una variable
                 quantity_token = next(token_iter)
-                if quantity_token[0] not in ['NUMBER', 'VARIABLE']:
+                if quantity_token[0] not in ['NUMBER', 'CONSTANT'] and quantity_token[1] not in variables:
                     raise SyntaxError(f"Expected a number or variable after {item_token[1]}, got {quantity_token[1]}")
 
                 # Se espera un paréntesis de cierre después de la asignación
@@ -207,7 +224,7 @@ def parse_comands(tokens):
 
                 # Se espera que el siguiente token sea un número o una variable
                 quantity_token = next(token_iter)
-                if quantity_token[0] not in ['NUMBER', 'VARIABLE']:
+                if quantity_token[0] not in ['NUMBER', 'CONSTANT'] and quantity_token[1] not in variables:
                     raise SyntaxError(f"Expected a number or variable after {item_token[1]}, got {quantity_token[1]}")
 
                 # Se espera un paréntesis de cierre después de la asignación
@@ -222,7 +239,7 @@ def parse_comands(tokens):
             elif token[0] == 'KEYWORD' and token[1] == 'move-dir':
                 # Se espera que el siguiente token sea un número o una variable que represente la cantidad de pasos
                 steps_token = next(token_iter)
-                if steps_token[0] not in ['NUMBER', 'VARIABLE']:
+                if steps_token[0] not in ['NUMBER', 'CONSTANT'] and steps_token[1] not in variables:
                     raise SyntaxError(f"Expected a number or variable for steps, got {steps_token[1]}")
 
                 # Se espera que el siguiente token sea una de las direcciones válidas
@@ -265,7 +282,7 @@ def parse_comands(tokens):
             elif token[0] == 'KEYWORD' and token[1] == 'move-face':
                 # Se espera que el siguiente token sea un número o una variable que represente la cantidad de pasos
                 steps_token = next(token_iter)
-                if steps_token[0] not in ['NUMBER', 'VARIABLE']:
+                if steps_token[0] not in ['NUMBER', 'CONSTANT'] and steps_token[1] not in variables:
                     raise SyntaxError(f"Expected a number or variable for steps, got {steps_token[1]}")
 
                 # Se espera que el siguiente token sea una de las direcciones válidas
@@ -388,7 +405,39 @@ def parse_comands(tokens):
                 # Verificar que se haya recogido al menos una dirección
                 if not conditions:
                     raise SyntaxError("No conditions provided for 'run-dirs' command")
-
+#Defun
+            elif token[0] == 'KEYWORD' and token[1] == 'defun':
+                name_token = next(token_iter)
+                if name_token[0] != 'VARIABLE':
+                    raise SyntaxError(f"Expected a function name after 'defun', got {name_token[1]}")
+                open_paren_token = next(token_iter)
+                if open_paren_token[1] != '(':
+                    raise SyntaxError('Expected opening parentheses for parameters')
+                stack.append(open_paren_token)
+                param = next(token_iter)
+                parameters = []
+                while param[1] != ')':
+                    if param == None : raise SyntaxError('Expected closing parentheses for parameters')
+                    if param[0] != 'VARIABLE': SyntaxError('Not valid parameter')
+                    parameters.append(param[1])
+                    param = next(token_iter)
+                stack.pop()
+                exec(f"fun_{name_token[1]} = function(name_token[1], parameters)") 
+                exec(f"functions[name_token[1]] = fun_{name_token[1]}")
+#Function call
+            elif token[0] == 'VARIABLE' and token[1] in functions:
+                param = next(token_iter)
+                parameters = []
+                while param[1] != ')':
+                    if param == None : raise SyntaxError('Expected closing parentheses for parameters')
+                    if param[0] != 'VARIABLE': SyntaxError('Not valid parameter')
+                    parameters.append(param[1])
+                    param = next(token_iter)
+                stack.pop()
+                expected = len(functions[token[1]].parameters)
+                recieved = len(parameters)
+                if recieved != expected:
+                    raise SyntaxError(f"Expected {expected} parameters, {recieved} recieved")
             # Aquí se agregarían más condiciones para manejar otros tipos de tokens y estructuras
             else:
                 raise SyntaxError(f"Unexpected token: {token[1]}")
