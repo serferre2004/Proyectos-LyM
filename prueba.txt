@@ -1,0 +1,11 @@
+(defvar foo 3)
+
+( if (can-move? :north) (move-dir 1 :back ) (null))
+
+(defun bar (a b)
+    (move foo)
+    (put :chips a)
+    (run-dirs (:left :front :left :back :right)))
+
+(bar 4 5)
+(skip foo)
