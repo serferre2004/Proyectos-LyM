@@ -1,4 +1,4 @@
-import codeparser as f
+import P0.codeparser as f
 with open('prueba.txt', 'r') as file:
     # Read the entire contents of the file into a string variable
     file_contents = file.read()
