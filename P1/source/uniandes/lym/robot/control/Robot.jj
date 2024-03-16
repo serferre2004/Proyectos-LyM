@@ -26,7 +26,10 @@ package uniandes.lym.robot.control;
 
 import uniandes.lym.robot.kernel.*;
 import uniandes.lym.robot.view.Console;
- 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.awt.Point;
 import java.io.*;
 import java.util.Vector;
@@ -38,10 +41,12 @@ public class Robot
 
 
 	private RobotWorldDec world;
-	
+	private RobotWorld world2;
+	public Map<String, Integer> listaVariables = new HashMap<String, Integer>();
+	public Map<String, ArrayList<String>> listaProcedures = new HashMap<String, ArrayList<String>>();
 	
 	void setWorld(RobotWorld w) {
-		world = (RobotWorldDec) w;	
+		world = (RobotWorldDec) w;
 	}
 
 	String salida=new String();
@@ -58,25 +63,74 @@ SKIP:
 
 TOKEN: /* Nombres de Comandos */
 {
-
 			<MOV:  "Mov">
-		| 	<RIGHT: "RIGHT">
+		| 	<TURNRIGHT: "TURNRIGHT">
 		| 	<PUT: "Put">
 		| 	<PICK: "Pick">
 		|  < POP: "Pop" >
 		|  <GO: "GO" >
         |  < HOP:  "HOP" >		
-
 }
 
 TOKEN:
 {
 		<BALLOONS:  "BALLOONS" >
 		|	<CHIPS:     "CHIPS"  >	
-
 }
 
+TOKEN : /* Comandos simples */
+{
+  		< JUMP: "jump" >
+  		| < WALK: "walk" >
+  		| < LEAP: "leap" >
+  		| < TURN: "turn" >
+  		| < TURNTO: "turnto" >
+  		| < DROP: "drop" >
+  		| < GET: "get" >
+  		| < GRAB: "grab" >
+  		| < LETGO: "letgo" >
+  		| < NOP: "nop" >
+}
 
+TOKEN: /* Definiciones */
+{
+		< DEFVAR: "defvar" >
+		| < DEFPROC: "defproc" >	
+}
+
+TOKEN: /* Condicionales */
+{
+		< FACING: "facing" >
+		| < CAN: "can" >
+		| < NOT: "not" >
+		| < IF: "if" >
+		| < ELSE: "else" >
+		| < WHILE: "while" >
+		| < REPEAT: "repeat" >
+		| < TIMES: "times" >	
+}
+
+TOKEN: /* Direcciones */
+{
+		< FRONT: "front" >
+		| < RIGHT: "right" >
+		| < LEFT: "left" >
+		| < BACK: "back" >	
+}
+
+TOKEN: /* Cardinales */
+{
+		< NORTH: "north" >
+		| < WEST: "west" >
+		| < EAST: "east" >
+		| < SOUTH: "south" >	
+}
+
+TOKEN : 
+{
+  <NOMBRE: <LETRA> (<LETRA> | <NUM>)* >
+| < #LETRA : ["a"-"z", "A"-"Z"] >
+}
 
 TOKEN :
 {
@@ -84,8 +138,6 @@ TOKEN :
 		|  	<#DIGIT: ["0"-"9"] >
         
 }
-
-
 
 	//boolean command(uniandes.lym.robot.view.Console sistema) :
 	boolean command(Console sistema):
@@ -97,14 +149,18 @@ TOKEN :
 
 	
 	{
-		(		  (
-		   <RIGHT> "(" ")" {world.turnRight();salida = "Command: Turnright";}
+		((
+		   <TURNRIGHT> "(" ")" {world.turnRight();salida = "Command: Turnright";}
 		| 	<MOV>  "(" x=num() ")" {world.moveForward(x,false);salida = "Command: Moveforward ";}  
 		| 	<HOP>  "(" x=num() ")" {world.moveForward(x,true);salida = "Command:Jumpforward ";}
 		| 	<GO>  "(" x=num() "," y=num()")" {world.setPostion(x,y);salida = "Command:GO ";}  
 		|  <PUT> "("  put() ")"					  			
 		|  <PICK> "(" get()  ")"	
 	    |  < POP > "(" x=num() ")" {world.popBalloons(x); salida = "Comando:  Pop";}
+	    | Procedure() {}
+	    | Variable() {}
+	    | simpleCommand() {}
+	    | scName() {}
 		) ";" 
 
 		{
@@ -138,24 +194,248 @@ TOKEN :
 	{
 		( <CHIPS>   "," f=num() {world.pickChips(f);salida = "Command:  Pick chips";})
 		|  	  ( <BALLOONS>   "," f=num() {world.grabBalloons(f);salida="Command:  Pick balloons";})	 
-
 	}
 
-	
-	
+	void Procedure() :
+	{
+	  ArrayList<String>	parametros = new ArrayList<String>();
+	  	String nombre = "";
+	}
+	{
+	  
+		( <DEFPROC> nombre=name() "(" parametros=parameters() ")" "{" block() "}"{})
+		{
+		  listaProcedures.put(nombre,parametros);
+		}
+	}
 
-	/**
-	 * Unsigned decimal number
-	 * @return the corresponding value of the string
-	 * @error  corresponding value is too large
-	 */
+	String Variable() :
+	{String n="";
+	int v = 0;
+	}
+	{
+	  ( <DEFVAR> n=name() v=value())
+	  { listaVariables.put(n,v);
+	  	return n;}
+	}
+
+	int value():
+	{
+	  String v="";
+	  Integer n=0;
+	}
+	{
+	  ( n=num() | v=Variable() )
+	  {
+		if(v!="")
+		{
+		  if(!listaVariables.containsKey(v))
+		  {
+			throw new Error("Varaible no definida");
+		    }
+		  else
+		  {
+			n=listaVariables.get(v);
+			return n;
+		    }
+		}
+		else
+		{
+		  return n;
+		}
+	 	}
+	  
+	}
+
+	ArrayList<String> parameters():
+	{
+	  	String para1="";
+	  	String p = "";
+		ArrayList<String> parametros = new ArrayList<String>();
+	  }
+	  {
+	   (p=parametro() { parametros.add(p); })("," para1 = parametro() { parametros.add(para1);})*
+	   {
+	     //parametros.add(para1);
+	     return parametros;
+	     }
+	  }
+
+	  String parametro ():
+	  {
+		String para="";
+		Integer n=0;
+	     }
+	  {
+		(n = num() | para=direc() | para=card())
+		{
+		  if (para!="")
+		  { 
+		  	return para;
+		 	}
+		 	else { return para + n;}
+		  }
+	    }
+
+	void block():
+	{}
+	{
+	  commands()
+	}
+
+	void commands():
+	{
+		
+	}
+	{
+		( procedureCall() {}
+		| controlStructure() {}
+		| simpleCommand() {})
+	}
+
+	void procedureCall():
+	{
+	  String n="";
+	  String p="";
+	  String p1="";
+	  }
+	{
+	 n = name() "(" p=parametro()(","p1=parametro())* ")"
+	 {
+	   if (listaProcedures.containsKey(n))
+	   {
+			if (!((listaProcedures.get(n)).contains(p)) || !((listaProcedures.get(n)).contains(p1)))
+			{ 
+				throw new Error("Parametros incorrectos");
+			  }
+			  else { throw new Error("Procedimiento no definido"); } 
+	     }
+	 }
+	}
+
+	void variableCall():
+	{
+	  String n="";
+	  Integer v=0;
+	}
+	{
+	  (n = name() "=" v = value())
+	  {
+		if(n!="")
+		{
+		  if(!listaVariables.containsKey(n))
+		  {
+			throw new Error("Varaible no definida");
+		    }
+		  else
+		  {
+			listaVariables.put(n,v);
+			
+		  }
+		}
+	  }
+	}
+
+	void controlStructure():
+	{Boolean c=true;
+	 String b1="";
+	 String b2="";
+	}
+	{
+	 (<IF> condition() block() <ELSE> block() {})
+	 | (<WHILE> condition() block())
+	 | (<REPEAT> num() <TIMES> block())
+	}
+
+	Boolean condition():
+	{
+	 String o="";
+	 Boolean r=true;
+	 Boolean c=true;
+	 int valor=0;
+	 }
+	{
+	  (<FACING> "(" o=card() ")" {{if(o=="north") {valor=0;}
+	  if(o=="south") {valor=1;}if(o=="west") {valor=3;}if(o=="east") {valor=2;}};if(world.getFacing()!=valor) {r=false;}}
+	  | <CAN> "(" c=simpleCommand() ")" {if(c==false) {r=false;}}
+	  | <NOT> ":" c=condition() {if(c==true) {r=false;}if(c==false) {r=true;}})
+	 {
+	  return r;
+	 }
+	}
+
+	Boolean scName() :
+	{
+	 String n="";
+	 int v=0;
+	}
+	{
+	 ( n=name() "=" v=value() {if(listaVariables.containsKey(n)){listaVariables.put(n,v);salida="Command:  Assing Value";}})
+	 {return true;}
+	}
+
+	Boolean simpleCommand() :
+	{
+		int x=0;
+		int y=0;
+		int v=0;
+		String d="";
+		String o="";
+		String n="";
+		int valor=0;
+		Boolean r=true;
+	}
+	{
+		( <JUMP> "(" (x=num() "," y=num()) ")" {try {world.setPostion(x,y);} catch(Exception e) {r=false;};salida = "Command:  Jump";})
+		| ( <WALK> "(" (d=direc() "," v=num() ")"
+		{if (d=="left"){world.turnRight();world.turnRight();world.turnRight();
+		try {world.moveForward(v,false);} catch(Exception e) {r=false;};world.turnRight();salida="Command:  Walk";}
+		if (d=="right"){world.turnRight();try {world.moveForward(v,false);} catch(Exception e) {r=false;};
+		world.turnRight();world.turnRight();world.turnRight();salida="Command:  Walk";}
+		if (d=="back"){world.turnRight();world.turnRight();try {world.moveForward(v,false);} catch(Exception e) {r=false;}
+		;world.turnRight();world.turnRight();salida="Command:  Walk";}
+		if (d=="front"){try {world.moveForward(v,false);} catch(Exception e) {r=false;};salida="Command:  Walk";}}
+		| o=card() "," v=num() ")"
+		{{if(o=="north") {valor=0;}if(o=="south") {valor=1;}if(o=="west") {valor=3;}if(o=="east") {valor=2;}
+		  while(world.getFacing()!=valor) {world.turnRight();}
+		  try {world.moveForward(v,false);} catch(Exception e) {r=false;};};salida="Command:  Walk";}
+		| v=num() ")" {try {world.moveForward(v,false);} catch(Exception e) {r=false;};salida="Command:  Walk";}))
+		| ( <LEAP> "(" (d=direc() "," v=num() ")"
+		{if (d=="left"){world.turnRight();world.turnRight();world.turnRight();
+		try {world.moveForward(v,true);} catch(Exception e) {r=false;};world.turnRight();salida="Command:  Leap";}
+		if (d=="right"){world.turnRight();try {world.moveForward(v,true);} catch(Exception e) {r=false;}
+		;world.turnRight();world.turnRight();world.turnRight();salida="Command:  Leap";}
+		if (d=="back"){world.turnRight();world.turnRight();try {world.moveForward(v,true);} catch(Exception e) {r=false;}
+		;world.turnRight();world.turnRight();salida="Command:  Leap";}
+		if (d=="front"){try {world.moveForward(v,true);} catch(Exception e) {r=false;};salida="Command:  Leap";}}
+		| o=card() "," v=num() ")"
+		{{if(o=="north") {valor=0;}if(o=="south") {valor=1;}if(o=="west") {valor=3;}if(o=="east") {valor=2;}
+		  while(world.getFacing()!=valor) {world.turnRight();}
+		  try {world.moveForward(v,true);} catch(Exception e) {r=false;};};salida="Command:  Leap";}
+		|  v=num() ")" {try {world.moveForward(v,true);} catch(Exception e) {r=false;};salida="Command:  Leap";}))
+		| ( <TURN> "(" d=direc() ")"
+		{if (d=="left"){world.turnRight();world.turnRight();world.turnRight();salida="Command:  Turn";}
+		if (d=="right"){world.turnRight();salida="Command:  Turn";}
+		if (d=="back"){world.turnRight();world.turnRight();salida="Command:  Turn";}
+		if (d=="front"){salida="Command:  Turn";}})
+		| ( <TURNTO> "(" o=card() ")"
+		{{if(o=="north") {valor=0;}if(o=="south") {valor=1;}if(o=="west") {valor=3;}if(o=="east") {valor=2;}
+		  while(world.getFacing()!=valor) {world.turnRight();}};salida="Command:  Turn to";})//
+		| ( <DROP> "(" v=num() ")" {try {world.putChips(v);} catch(Exception e) {r=false;};salida="Command:  Drop chips";})
+		| ( <GET> "(" v=num() ")" {try {world.pickChips(v);} catch(Exception e) {r=false;};salida="Command:  Get chips";})
+		| ( <GRAB> "(" v=num() ")" {try {world.grabBalloons(v);} catch(Exception e) {r=false;};salida="Command:  Pick balloons";})
+		| ( <LETGO> "(" v=num() ")" {try {world.putBalloons(v);} catch(Exception e) {r=false;};salida="Command:  Put balloons";})
+		| ( <NOP> "(" ")" {salida="Command:  Do nothing";})
+		{return r;}	 
+	}	
 
 	int num() throws Error:
 	{	
 		int total=1;
+		Token token;
 	}
 	{
-		<NUM>
+		token=<NUM>
 		{
 			try 
 			{
@@ -167,6 +447,42 @@ TOKEN :
 			}
 			return total;
 		}
-	}
+}
 
-	
+String name():
+{String valor="";
+ Token token;
+}
+{
+ token=<NOMBRE>
+ {
+  valor = token.image;
+  return valor;
+ }
+}
+
+	String card():
+	{
+	String direccion = "";
+	Token token;
+	}
+	{
+	  (token=<NORTH> | token=<SOUTH> | token=<WEST> | token=<EAST>)
+	{
+	  direccion = token.image;
+	   return direccion;
+	 }
+}	  
+
+	String direc():
+	{
+	String direccion ="";
+	Token token;
+	}
+	{
+	  (token = <LEFT> | token=<RIGHT> | token=<FRONT> | token=<BACK>)
+	 {
+	  direccion = token.image;
+	   return direccion;
+	 }
+}
