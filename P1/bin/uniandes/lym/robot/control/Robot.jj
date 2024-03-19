@@ -26,7 +26,10 @@ package uniandes.lym.robot.control;
 
 import uniandes.lym.robot.kernel.*;
 import uniandes.lym.robot.view.Console;
- 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.awt.Point;
 import java.io.*;
 import java.util.Vector;
@@ -36,14 +39,18 @@ import java.util.LinkedList;
 public class Robot 
 {
 
-
+	private static final int NORTH = 0;
+	private static final int SOUTH = 1;
+	private static final int EAST = 2;
+	private static final int WEST = 3;
 	private RobotWorldDec world;
-	
+	private RobotWorld world2;
+	public Map<String, Integer> listaVariables = new HashMap<String, Integer>();
+	public Map<String, ArrayList<String>> listaProcedures = new HashMap<String, ArrayList<String>>();
 	
 	void setWorld(RobotWorld w) {
-		world = (RobotWorldDec) w;	
+		world = (RobotWorldDec) w;
 	}
-
 	String salida=new String();
 }
 PARSER_END(Robot)
@@ -58,25 +65,73 @@ SKIP:
 
 TOKEN: /* Nombres de Comandos */
 {
-
-			<MOV:  "Mov">
-		| 	<RIGHT: "RIGHT">
-		| 	<PUT: "Put">
-		| 	<PICK: "Pick">
-		|  < POP: "Pop" >
-		|  <GO: "GO" >
-        |  < HOP:  "HOP" >		
-
+		<MOV:  "move">
+		| < PUT: "put">
+		| < PICK: "pick">
+        | < TURN: "turn" >
+        | < ASSIGN: "=" >
+        | < SKP: "skip" >
+        | < FACE: "face" >
+        | < MOVDIR: "move-dir" >
+        | < RUNDIRS: "run-dirs" >
+        | < MOVFACE: "move-face" >
+        | < NULL: "null" >
 }
 
 TOKEN:
 {
-		<BALLOONS:  "BALLOONS" >
-		|	<CHIPS:     "CHIPS"  >	
-
+		<BALLOONS:  ":BALLOONS" >
+		|	<CHIPS: ":CHIPS"  >
 }
 
+TOKEN: /*Constantes */
+{
+		< CONSTANT: "Dim"|"myXpos"|"myYpos"|"myChips"|"myBalloons"|"balloonsHere"|"chipsHere"|"spaces" > 
+}
 
+TOKEN: /* Estructuras de control*/
+{
+		< IF: "if" >
+		| < LOOP: "loop" >
+		| < REPEAT: "repeat" >
+}
+
+TOKEN: /* Definiciones */
+{
+		< DEFVAR: "defvar" >
+		| < DEFUN: "defun" >	
+}
+
+TOKEN: /* Condicionales */
+{
+		< FACING: "facing?" >
+		| < BLOCKED: "blocked?" >
+		| < CANPUT: "can-put?" >
+		| < CANPICK: "can-pick?" >
+		| < CANMOVE: "can-move?" >
+		| < ISZERO: "isZero?" >
+		| < NOT: "not" >
+}
+
+TOKEN: /* Direcciones */
+{
+		< FRONT: ":front" >
+		| < RIGHT: ":right" >
+		| < LEFT: ":left" >
+		| < BACK: ":back" >
+		| < AROUND: ":around" >
+}
+
+TOKEN: /* Cardinales */
+{
+		< CARDINAL: ":north"|":west" |":east"|":south" >	
+}
+
+TOKEN : 
+{
+  <NOMBRE: <LETRA> (<LETRA> | <NUM>)* >
+| < #LETRA : ["a"-"z", "A"-"Z"] >
+}
 
 TOKEN :
 {
@@ -85,27 +140,39 @@ TOKEN :
         
 }
 
-
-
 	//boolean command(uniandes.lym.robot.view.Console sistema) :
-	boolean command(Console sistema):
+	boolean command(Console sistema): {boolean result;} {(result = single_command(sistema, true) { return result; })+}
+	boolean single_command(Console sistema, boolean exec) throws Error:
 	{	
 		
 		int x,y;
-		salida=new String();	
+		salida=new String();
+		boolean cond;
+		String name=new String();
+		int valor;
 	}
 
 	
 	{
-		(		  (
-		   <RIGHT> "(" ")" {world.turnRight();salida = "Command: Turnright";}
-		| 	<MOV>  "(" x=num() ")" {world.moveForward(x,false);salida = "Command: Moveforward ";}  
-		| 	<HOP>  "(" x=num() ")" {world.moveForward(x,true);salida = "Command:Jumpforward ";}
-		| 	<GO>  "(" x=num() "," y=num()")" {world.setPostion(x,y);salida = "Command:GO ";}  
-		|  <PUT> "("  put() ")"					  			
-		|  <PICK> "(" get()  ")"	
-	    |  < POP > "(" x=num() ")" {world.popBalloons(x); salida = "Comando:  Pop";}
-		) ";" 
+		  "("(
+		   <ASSIGN> name=name() valor=num() {if(exec) {  if (listaVariables.containsKey(name)) { listaVariables.put(name, valor); salida = "Command: Value "+valor+" assigned to "+name; }else { salida = "No variable named "+name; } } }
+		|  <MOV>  x=num() {if(exec) { world.moveForward(x,false);salida = "Command: Moveforward ";} }
+		|  <SKP>  x=num() { if(exec) {world.moveForward(x,true);salida = "Command: Skip";} }
+		|  <TURN> turn(exec)
+		|  <FACE> face(exec)
+		|  <PUT>  put(exec)					  			
+		|  <PICK> get(exec)
+		|  <MOVDIR> move_dir(exec)
+		|  <RUNDIRS> run_dirs(exec)
+		|  <MOVFACE> move_face(exec)
+		|  <NULL> {if(exec){salida = "Command: null"; } }
+		|  <IF> "(" cond = condition()")" single_command(sistema,cond && exec) single_command(sistema,!cond && exec)
+		|  <LOOP> cond = condition() single_command(sistema, exec) 
+		|  <REPEAT> x=num() single_command(sistema, exec)
+		|  <DEFVAR> name=name() valor=num() {if(exec) { listaVariables.put(name, valor); salida = "Command: variable "+name+" created with value: "+valor; } }
+		|  <DEFUN> name=name() { if(exec){listaProcedures.put(name, new ArrayList<String>()); }} "("(<NOMBRE> { if(exec){ listaProcedures.get(name).add(token.image);listaVariables.put(name, 0); }})*")" single_command(sistema,true) { if(exec){ for (String par:listaProcedures.get(name)) { listaVariables.remove(par); } } }
+		|  <NOMBRE> { if(exec){ if (!listaProcedures.containsKey(token.image)) { throw new Error("Function "+token.image+" not defined"); } } }fun_call(token.image, exec) 
+		) ")"
 
 		{
 		    try {
@@ -116,46 +183,131 @@ TOKEN :
 	    			 
 			sistema.printOutput(salida);
 			return true;
-		})+
+		}
 
     	| <EOF> {return false;} 
 	}
 
-	void put() :
+	void put(boolean exec) :
 	{
 		int f=1;	
 	}
 	{
-		( <CHIPS>    "," f=num() {world.putChips(f); salida = "Command:  Put Chips"; })
-		|  	  ( <BALLOONS>   "," f=num() {world.putBalloons(f); salida = "Command:  Put Balloons";})	 
+		( <CHIPS> f=num() { if(exec) {world.putChips(f); salida = "Command:  Put Chips"; } }) 
+		|  	  ( <BALLOONS> f=num() { if(exec){world.putBalloons(f); salida = "Command:  Put Balloons";} }) 
 
 	}
 
-	void get() :
+	void get(boolean exec) :
 	{
 		int f=1;	
 	}
 	{
-		( <CHIPS>   "," f=num() {world.pickChips(f);salida = "Command:  Pick chips";})
-		|  	  ( <BALLOONS>   "," f=num() {world.grabBalloons(f);salida="Command:  Pick balloons";})	 
-
+		( <CHIPS> f=num() { if(exec){world.pickChips(f);salida = "Command:  Pick chips";} })
+		|  	  ( <BALLOONS> f=num() { if(exec){world.grabBalloons(f);salida="Command:  Pick balloons";} })	 
 	}
 
-	
-	
+	void turn(boolean exec) : { }
+	{
+		(<LEFT>|<RIGHT>|<AROUND>) { if(exec){world.turnRight();if (!token.image.equals(":right")){world.turnRight();}if (token.image.equals(":left")) { world.turnRight(); }salida = "Command: turn "+token.image; } } 
+	}
 
-	/**
-	 * Unsigned decimal number
-	 * @return the corresponding value of the string
-	 * @error  corresponding value is too large
-	 */
+	void face(boolean exec) : {
+	int orientation;
+	}
+	{
+	  	<CARDINAL>
+		{if(exec)
+	  	{String O = token.image;
+	  	 if (O.equals(":north")) {orientation = NORTH;}
+	  	 else if (O.equals(":south")) {orientation = SOUTH;}
+	  	 else if (O.equals(":east")) {orientation = EAST;}
+	  	 else {orientation = WEST;}
+	  	 while (world.getFacing() != orientation) { world.turnRight(); }
+	  	 salida = "Command: face "+token.image;
+	 	} }
+	}
+
+	void turn_dir(boolean exec) : {String dir;}
+	{ (<FRONT>|<LEFT>|<RIGHT>|<BACK>) {if(exec) { 
+	  	dir = token.image;
+		if (!dir.equals(":front")) {
+		  world.turnRight();
+		  if (!dir.equals(":right")){
+		    world.turnRight();}
+		  if (dir.equals(":left")) {
+		      world.turnRight(); }
+		      }} }
+	}
+
+	void move_dir(boolean exec): {int facing = world.getFacing(); int x;}
+	{
+		x=num() turn_dir(exec)
+		{ if(exec) {world.moveForward(x,false);
+		while (world.getFacing() != facing) { world.turnRight();}
+		salida = "Command: move-dir";} }
+	}
+
+	void run_dirs(boolean exec): {int facing = world.getFacing();}
+	{
+	  	(turn_dir(exec) { if(exec){world.moveForward(1,false); while (world.getFacing() != facing) { world.turnRight();} } })+
+	  	{ if(exec){ salida = "Command: run-dirs"; } }
+	}
+
+	void move_face(boolean exec): {int x;}
+	{
+	  x = num() face(exec) { if(exec){world.moveForward(x,false);salida="Command: move-face";} }
+	}
+	boolean condition(): {int x;Token object;boolean result;}
+	{
+		(<FACING> <CARDINAL> {
+		 String O = token.image;
+		 int orientation;
+	  	 if (O.equals(":north")) {orientation = NORTH;}
+	  	 else if (O.equals(":south")) {orientation = SOUTH;}
+	  	 else if (O.equals(":east")) {orientation = EAST;}
+	  	 else {orientation = WEST;}
+	  	 if (world.getFacing() == orientation) { return true; } { return false; }} |
+		 <BLOCKED> {
+		   x = world.getPosition().x; int facing = world.getFacing();
+		   int y = world.getPosition().y; int tam = world.getN();
+			if (facing == NORTH && y >1) { return world.isBlocked(new Point(x, y-1)); }
+			else if (facing == SOUTH && y < tam) { return world.isBlocked(new Point(x, y+1)); }
+			else if (facing == WEST && x < tam) { return world.isBlocked(new Point(x+1, y)); }
+			else if (facing == EAST && x > 1) { return world.isBlocked(new Point(x-1, y)); }
+			return true;
+		 }|
+		 <CANPUT> (object = <CHIPS>|object = <BALLOONS>) x=num() {
+		   if (object.image.equals(":CHIPS")) {
+		     if (x <= world.freeSpacesForChips() && x <= world.getMyChips()) { return true; }else { return false; } }
+		   else { if (x<= world.getMyBalloons()) { return true; }else { return false; } } } |
+		 <CANPICK> (object = <CHIPS>|object = <BALLOONS>) x=num() {
+		 if (object.image.equals(":CHIPS")) { if (x<= world.chipsToPick()) { return true; }else { return false; } }
+		 else { if (x<= world.countBalloons()) { return true; }else { return false; } } }|
+		 <CANMOVE> object = <CARDINAL> {
+		   x = world.getPosition().x;
+		   int y = world.getPosition().y; int tam = world.getN();
+			if (object.image.equals(":north") && y >1) { return !world.isBlocked(new Point(x, y-1)); }
+			else if (object.image.equals(":south") && y < tam) { return !world.isBlocked(new Point(x, y+1)); }
+			else if (object.image.equals(":west") && x < tam) { return !world.isBlocked(new Point(x+1, y)); }
+			else if (object.image.equals(":east") && x > 1) { return !world.isBlocked(new Point(x-1, y)); }
+			return false;
+		 }|
+		 <ISZERO> x=num() {return x == 0; }|
+		 <NOT> result = condition() { return !result; })
+	}
+
+	void fun_call(String fun,boolean exec) throws Error: {ArrayList<Integer> p_values = new ArrayList<Integer>();int p_count = 0; int p;}
+	{
+	    (p=num() {p_values.add((Integer) p); p_count++;})* { if (p_count != listaProcedures.get(fun).size()) { throw new Error("Unmatched parameter number for "+fun); } }
+	}
 
 	int num() throws Error:
 	{	
 		int total=1;
 	}
 	{
-		<NUM>
+		(<NUM>
 		{
 			try 
 			{
@@ -165,8 +317,35 @@ TOKEN :
 			{
 				throw new Error("Number out of bounds: "+token.image+" !!");
 			}
-			return total;
 		}
-	}
+		|<CONSTANT>
+		{
+		  	String constant = token.image;
+		  	if (constant.equals("Dim")) {total = world.getN(); }
+		  	else if (constant.equals("myXpos")) {total = (int) world.getPosition().getX(); }
+		  	else if (constant.equals("myYpos")) {total = (int) world.getPosition().getY(); }
+		  	else if (constant.equals("myChips")) {total = world.getMyChips(); }
+		  	else if (constant.equals("myBalloons")) {total = world.getMyBalloons(); }
+		  	else if (constant.equals("balloonsHere")) {total = world.countBalloons(); }
+		  	else if (constant.equals("chipsHere")) {total = world.chipsToPick(); }
+		  	else {total = world.freeSpacesForChips(); }
+		}
+		|<NOMBRE>
+		{
+			if (!listaVariables.containsKey(token.image)) {throw new Error("Not variable named "+token.image); }
+			total = listaVariables.get(token.image);
+		}
+		) { return total; }
+}
 
-	
+String name():
+{String valor="";
+ Token token;
+}
+{
+ token=<NOMBRE>
+ {
+  valor = token.image;
+  return valor;
+ }
+}
